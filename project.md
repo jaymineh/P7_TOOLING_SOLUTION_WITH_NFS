@@ -35,11 +35,53 @@ After running the above command to create the physical volume, used the `sudo pv
 - Used the `lvcreate` utility to create the required logical volumes which are `lv-apps`, `lv-opt` & `lv-logs`. Assigned them 9GB each. Checked the config using `sudo lvmdiskscan` & `sudo lvs`
 ![Logical VG create](lvcreate.png)
 
-*I ran into an issue where I assigned each LV 10GB and ran out of space while configuring the third LV. I had to use `lvremove nfs-vg` to remove all the LVs from the `nfs-vg` volume group.
+*I ran into an issue where I assigned each LV 10GB and ran out of space while configuring the third LV. I had to use `lvremove nfs-vg` to remove all the LVs from the `nfs-vg` volume group*
 ![Error LV creation](errorlvcreate.png)
 
+- Formatted the logical volumes using the `xfs` filesystem. Used `sudo mkfs.xfs /<filepath>`
+![Filesystem format](xfs.png)
+
+*Use `sudo vgdisplay -v #view complete setup - VG, PV, and LV` to get a comprehensive report of all PVs, VGs and LVs*
+
+- Created mount points on the /mnt directory for the 3 created logical volumes where data will be stored. After creating the points, mounted all LVs to their respective paths.
+![Mount points](mount.png)
+
+**Step 1.1 - Install NFS Server**
+---
+
+- Ran the following commands to update the RHEL server and install the NFS.
+```
+sudo yum -y update
+sudo yum install nfs-utils -y
+```
+- Ran the following commands to startup the NFS server and check if itis running.
+```
+sudo systemctl start nfs-server.service
+sudo systemctl enable nfs-server.service
+sudo systemctl status nfs-server.service
+```
+- Set up the permissions on the server to allow the web servers read and execute files on the NFS. Restart the NFS server after config.
+![Permission modification](permission.png)
+
+- Locate the subnet CIDR from AWS (or wherever) as this is needed to allow clients on the same subet to access the NFS files.
+![Subnet CIDR](subnetcidr.png)
+
+- Using the subnet CIDR gooten from earlier, we cconfigure access to NFS for clients within the same subnets. Ran a `sudo vi /etc/exports` and pasted the following config lines to declare the subnet CIDR to be used for communication.
+```
+/mnt/apps <Subnet-CIDR>(rw,sync,no_all_squash,no_root_squash)
+/mnt/logs <Subnet-CIDR>(rw,sync,no_all_squash,no_root_squash)
+/mnt/opt <Subnet-CIDR>(rw,sync,no_all_squash,no_root_squash)
+```
+
+- Ran `sudo exportfs -arv` to export the above CIDR range.
+
+- Ran `rpcinfo -p | grep nfs` to check what port is being used by NFS so it can be opened in the security group.
+![Port info](grepnfs.png)
+
+- Opened up the required ports from the above step to allow inbound traffic. Tightened security to use only the private IP of the machine and not 0.0.0.0
+![Security rules](inbound.png)
+
+**Step 2 - Configure The Database Server**
+---
+
 - 
-
-
-
-
