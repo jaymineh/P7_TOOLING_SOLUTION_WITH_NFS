@@ -84,4 +84,24 @@ sudo systemctl status nfs-server.service
 **Step 2 - Configure The Database Server**
 ---
 
-- 
+- Installed MySQL server by running `sudo yum install -y mysql-server`. Ran the following code below which enables, restarts and displays the status of the server.
+```
+sudo systemctl enable mysqld
+sudo systemctl restart mysqld
+sudo systemctl status mysqld
+```
+
+- Ran the following code below to configure the database setup.
+```
+sudo mysql
+CREATE DATABASE tooling;
+CREATE USER 'webaccess'@'<PrivateIP>' IDENTIFIED BY '<password>';
+GRANT ALL ON tooling.* TO 'webaccess'@'172.31.80.0/20';
+FLUSH PRIVILEGES;
+SHOW DATABASES;
+exit
+```
+![Show databases](showdb.png)
+
+**Step 3 - Prepare The Web Servers**
+---
