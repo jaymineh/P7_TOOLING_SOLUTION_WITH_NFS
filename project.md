@@ -98,9 +98,9 @@ sudo systemctl status nfs-server.service
 
 - Installed MySQL server by running `sudo apt install -y mysql-server`. Ran the following code below which enables, restarts and displays the status of the server.
 ```
-sudo systemctl enable mysqld
-sudo systemctl restart mysqld
-sudo systemctl status mysqld
+sudo systemctl enable mysql
+sudo systemctl restart mysql
+sudo systemctl status mysql
 ```
 *Note that for Redhat, you use `mysqld` & for Ubuntu use `mysql`.*
 
@@ -116,7 +116,78 @@ exit
 ```
 ![Show databases](showdb.png)
 
+- Edit the bind address so MySQL allows connection from the specified IP used when creating the user. Run `sudo vi /etc/mysql/mysql.conf.d/mysqld.cnf` and add the IP address to the config file to set up the binding.
+![Bind address](binding.png)
+
+- Run `sudo systemctl restart mysql` to restart MySQL so the changes can take effect.
+
 **Step 3 - Prepare The Web Servers**
 ---
 
-- forget: bind sql db, fstab, sudo mount, db error, 
+- Launch 3 new instances (the number depends on the use case) of RHEL 8 & edit the inbound rule for port 80 (web traffic). After launching the instances, run `sudo yum install nfs-utils nfs4-acl-tools -y` to install the NFS client on them. This is what will communicate with the NFS server to make them "redundant' where files that are edited or deleted in the mounted drives (which will be done below) will be consistent across all web servers.
+
+- Next step is to create a folder/directory on the webserver where the web content will be served (displayed so you can see it on the internet). The folder is `/var/www`. Run `sudo mkdir /var/www` to create the folder.
+
+- After the above folder has been created, we need to map it to the original drive (`mnt/apps`) in the server so the client can communicate with it. Run `sudo mount -t nfs -o rw,nosuid <NFS-Server-Private-IP-Address>:/mnt/apps /var/www`. Run `df -h` to confirm settings.
+![NFS mount check](nfsmountcheck.png)
+
+- Modify the `/etc/fstab` file and add `<NFS-Server-Private-IP-Address>:/mnt/apps /var/www nfs defaults 0 0` to make the changes persist after reboot.
+
+- Next step is to install the repository, Apache and PHP.
+```
+sudo yum install httpd -y
+
+sudo dnf install https://dl.fedoraproject.org/pub/epel/epel-release-latest-8.noarch.rpm
+
+sudo dnf install dnf-utils http://rpms.remirepo.net/enterprise/remi-release-8.rpm
+
+sudo dnf module reset php
+
+sudo dnf module enable php:remi-7.4
+
+sudo dnf install php php-opcache php-gd php-curl php-mysqlnd
+
+sudo systemctl start php-fpm
+
+sudo systemctl enable php-fpm
+
+setsebool -P httpd_execmem 1
+```
+
+- Verify that Apache files and directories are available on the web server on `/var/www` and on the NFS server in `/mnt/apps`. Created a file called `test.txt` and it was present in both the NFS and web server.
+![NFS server check](nfscheck.png)
+
+![web server check](wscheck.png)
+
+- Next step is to fork the GitHub repo where the tooling website source code is held to your (my) GitHub account.
+    - Install git by running`sudo yum install git -y`
+
+    - Run `git clone https://github.com/darey-io/tooling.git`. The code will copy the contents of the repo into the `/tooling` drive. See screenshot below:
+    ![Git clone](tooling.png)
+
+    - Change directory back into the `/html` (/`var/www/html`) folder. You will see the `tooling` & another `html` folder in it. We need to copy the contents of the `tooling` & sub `html` folder inside the current `/var/www/html` directory as that is where Apache web files are hosted.
+        - Run the following commands `mv tooling/* .` & `mv html/* .`. This command moves all the contents inside the folders (*) and drops them in the present/current directory (.)
+        ![Deploy source code to web server](movewebfiles.png)
+
+    - Install MySQL on the webserver. After that, update the website's config file to be able to connect to the database. Open the `/var/www/html/functions.php` file and modify it to include the DB private IP, user, password and database.
+    ![PHP function config](functionsphp.png)
+
+    - Apply the `tooling-db.sql` script from the webserver to the database server. 
+    ```
+    mysql -h <databse-private-ip> -u <db-username> -p <db-pasword> < tooling-db.sql
+    ```
+    ![Tooling DB script](toolingdb.png)
+
+    - After the script has successfully run, connect to the db vi running `mysql -h <databse-private-ip> -u <db-username> -p <db-pasword>`. After that,run `show databases` to see if the `tooling` database is there and then run `select * from users` to see the available users.
+    ![Show users](selectallusers.png)
+
+    - For permissions related issues, disable SELinux by running `sudo setenforce 0` from inside the `/var/www/html` folder. After that, run `sudo vi /etc/sysconfig/selinux` and set `SELINUX=disabled` to make change permanent.
+
+    - Restart httpd to make changes take effect. Run `sudo systemctl restart httpd`.
+
+    - Lastly, open `http://<Web-Server-Public-IP-Address-or-Public-DNS-Name>/index.php` in a browser and you should see a login page. After putting in the credentials, you willbe redirected to the propitix home page.
+    ![Login page](loginpage.png)
+
+    ![Login success](loginsuccess.png)
+
+    ![Propitix homepage](propitixhome.png)
