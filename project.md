@@ -191,8 +191,5 @@ setsebool -P httpd_execmem 1
     ![Login success](loginsuccess.png)
 
     ![Propitix homepage](propitixhome.png)
-<<<<<<< HEAD
 
     **Tooling Solution With NFS Deployed Successfully!**
-=======
->>>>>>> ba261df1ba91481b23e3a6f3eb2a5cbc431db61b
