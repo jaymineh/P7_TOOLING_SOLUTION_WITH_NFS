@@ -1,4 +1,4 @@
-# Project 7 - DevOps Tooling Website Solution
+# Project 7 - DevOps Tooling Website Solution With NFS
 
 **Step 1 - Prepare the NFS server**
 ---
@@ -191,3 +191,5 @@ setsebool -P httpd_execmem 1
     ![Login success](loginsuccess.png)
 
     ![Propitix homepage](propitixhome.png)
+
+    **Tooling Solution With NFS Deployed Successfully!**
