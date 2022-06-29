@@ -1,4 +1,4 @@
-# Project 7 - DevOps Tooling Website Solution
+# Project 7 - DevOps Tooling Website Solution With NFS
 
 **Step 1 - Prepare the NFS server**
 ---
