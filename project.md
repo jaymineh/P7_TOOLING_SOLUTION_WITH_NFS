@@ -7,14 +7,18 @@
 ![Confirm if EBS is attached](lsblk.png)
 
 - Ran the `df -h` command to see all available mounts on the server before configuring the various servers. Also installed the `lvm2` tool for storage/partitioning config.
+
 ![Pre-config check](preconf.png)
 
 - Used the `gdisk` tool to create a single partition on each of the 3 disks. This step mustbe done on all 3 disks to be valid.
     - Ran `sudo gdisk /dev/xvdb` to configure the partition on the first disk. Use the screenshot below as guide.
-    ![Configure partition](mountpart.png)
+    
+![Configure partition](mountpart.png)
+    
 *When creating a new partition, use 8E00 to select LVM*
 
 - Ran the `lsblk` command to see the newly configured partitions.
+
 ![Second disk check](diskcheck.png)
 
 - Ran the `lvmdiskscan` command to scan the disk before setting up the physical volumes that is needed for the partitioning.
@@ -27,6 +31,7 @@ sudo pvcreate /dev/xvdc1
 sudo pvcreate /dev/xvdd1
 ```
 After running the above command to create the physical volume, used the `sudo pvs` and `sudo lvmdiskscan` to check for the newly created physical volumes.
+
 ![Post-PV diskscan](config%2Bpostdiskscan.png)
 
 - Used the `vgcreate` utility to add all PVs to a volume group called nfs-vg. Checked the VG with `sudo vgs`
@@ -36,6 +41,7 @@ After running the above command to create the physical volume, used the `sudo pv
 ![Logical VG create](lvcreate.png)
 
 *I ran into an issue where I assigned each LV 10GB and ran out of space while configuring the third LV. I had to use `lvremove nfs-vg` to remove all the LVs from the `nfs-vg` volume group*
+
 ![Error LV creation](errorlvcreate.png)
 
 - Formatted the logical volumes using the `xfs` filesystem. Used `sudo mkfs.xfs /<filepath>`
@@ -44,6 +50,7 @@ After running the above command to create the physical volume, used the `sudo pv
 *Use `sudo vgdisplay -v #view complete setup - VG, PV, and LV` to get a comprehensive report of all PVs, VGs and LVs*
 
 - Created mount points on the /mnt directory for the 3 created logical volumes where data will be stored. After creating the points, mounted all LVs to their respective paths.
+
 ![Mount points](mount.png)
 
 - In order to make the above configs persist after a system restart, the UUID of the 3 paths needs to be copied and pasted in the /etc/fstab file. Ran `sudo blkid /dev/nfs-vg/*`, which shows the UUID ofthenewly created logical volumes.
@@ -70,6 +77,7 @@ sudo systemctl enable nfs-server.service
 sudo systemctl status nfs-server.service
 ```
 - Set up the permissions on the server to allow the web servers read and execute files on the NFS. Restart the NFS server after config. See screenshot below:
+
 ![Permission modification](permission.png)
 
 - Locate the subnet CIDR from AWS (or wherever) as this is needed to allow clients on the same subet to access the NFS files.
@@ -129,6 +137,7 @@ exit
 - Next step is to create a folder/directory on the webserver where the web content will be served (displayed so you can see it on the internet). The folder is `/var/www`. Run `sudo mkdir /var/www` to create the folder.
 
 - After the above folder has been created, we need to map it to the original drive (`mnt/apps`) in the server so the client can communicate with it. Run `sudo mount -t nfs -o rw,nosuid <NFS-Server-Private-IP-Address>:/mnt/apps /var/www`. Run `df -h` to confirm settings.
+
 ![NFS mount check](nfsmountcheck.png)
 
 - Modify the `/etc/fstab` file and add `<NFS-Server-Private-IP-Address>:/mnt/apps /var/www nfs defaults 0 0` to make the changes persist after reboot.
@@ -155,6 +164,7 @@ setsebool -P httpd_execmem 1
 ```
 
 - Verify that Apache files and directories are available on the web server on `/var/www` and on the NFS server in `/mnt/apps`. Created a file called `test.txt` and it was present in both the NFS and web server.
+
 ![NFS server check](nfscheck.png)
 
 ![web server check](wscheck.png)
@@ -163,7 +173,7 @@ setsebool -P httpd_execmem 1
     - Install git by running`sudo yum install git -y`
 
     - Run `git clone https://github.com/darey-io/tooling.git`. The code will copy the contents of the repo into the `/tooling` drive. See screenshot below:
-    ![Git clone](tooling.png)
+  ![Git clone](tooling.png)
 
     - Change directory back into the `/html` (/`var/www/html`) folder. You will see the `tooling` & another `html` folder in it. We need to copy the contents of the `tooling` & sub `html` folder inside the current `/var/www/html` directory as that is where Apache web files are hosted.
         - Run the following commands `mv tooling/* .` & `mv html/* .`. This command moves all the contents inside the folders (*) and drops them in the present/current directory (.)
@@ -179,7 +189,8 @@ setsebool -P httpd_execmem 1
     ![Tooling DB script](toolingdb.png)
 
     - After the script has successfully run, connect to the db vi running `mysql -h <databse-private-ip> -u <db-username> -p <db-pasword>`. After that,run `show databases` to see if the `tooling` database is there and then run `select * from users` to see the available users.
-    ![Show users](selectallusers.png)
+    
+  ![Show users](selectallusers.png)
 
     - For permissions related issues, disable SELinux by running `sudo setenforce 0` from inside the `/var/www/html` folder. After that, run `sudo vi /etc/sysconfig/selinux` and set `SELINUX=disabled` to make change permanent.
 
