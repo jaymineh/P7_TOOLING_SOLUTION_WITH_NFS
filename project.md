@@ -134,7 +134,7 @@ exit
 
 - Launch 3 new instances (the number depends on the use case) of RHEL 8 & edit the inbound rule for port 80 (web traffic). After launching the instances, run `sudo yum install nfs-utils nfs4-acl-tools -y` to install the NFS client on them. This is what will communicate with the NFS server to make them "redundant' where files that are edited or deleted in the mounted drives (which will be done below) will be consistent across all web servers.
 
-- Next step is to create a folder/directory on the webserver where the web content will be served (displayed so you can see it on the internet). The folder is `/var/www`. Run `sudo mkdir /var/www` to create the folder.
+- Next step is to create a folder/directory on the webserver where the web content will be served (displayed so you can see it on the internet). The folder is `/var/www`. Run `sudo mkdir /var/www` to create the folder. Note that this is to be done on any of the webservers. If comms has been established with the NFS server, you would only need to close the repo on one webserver and it would appear on all.
 
 - After the above folder has been created, we need to map it to the original drive (`mnt/apps`) in the server so the client can communicate with it. Run `sudo mount -t nfs -o rw,nosuid <NFS-Server-Private-IP-Address>:/mnt/apps /var/www`. Run `df -h` to confirm settings.
 
@@ -154,7 +154,7 @@ sudo dnf module reset php
 
 sudo dnf module enable php:remi-7.4
 
-sudo dnf install php php-opcache php-gd php-curl php-mysqlnd
+sudo dnf install php php-opcache php-gd php-curl php-mysqlnd -y
 
 sudo systemctl start php-fpm
 
@@ -179,20 +179,20 @@ setsebool -P httpd_execmem 1
         - Run the following commands `mv tooling/* .` & `mv html/* .`. This command moves all the contents inside the folders (*) and drops them in the present/current directory (.)
         ![Deploy source code to web server](movewebfiles.png)
 
-    - Install MySQL on the webserver. After that, update the website's config file to be able to connect to the database. Open the `/var/www/html/functions.php` file and modify it to include the DB private IP, user, password and database.
+    - Install MySQL client (`sudo yum install -y mysql`) on the webserver. After that, update the website's config file to be able to connect to the database. Open the `/var/www/html/functions.php` file and modify it to include the DB private IP, user, password and database.
     ![PHP function config](functionsphp.png)
 
     - Apply the `tooling-db.sql` script from the webserver to the database server. 
     ```
-    mysql -h <databse-private-ip> -u <db-username> -p <db-pasword> < tooling-db.sql
+    mysql -u <db-username> -p -h <db-private-ip> tooling < tooling-db.sql
     ```
     ![Tooling DB script](toolingdb.png)
 
-    - After the script has successfully run, connect to the db vi running `mysql -h <databse-private-ip> -u <db-username> -p <db-pasword>`. After that,run `show databases` to see if the `tooling` database is there and then run `select * from users` to see the available users.
+    - After the script has successfully run, connect to the db via running `mysql -h <databse-private-ip> -u <db-username> -p <db-pasword>`. After that, run `show databases` to see if the `tooling` database is there, use `use tooling` to select the tooling database and then run `select * from users` to see the available users.
     
   ![Show users](selectallusers.png)
 
-    - For permissions related issues, disable SELinux by running `sudo setenforce 0` from inside the `/var/www/html` folder. After that, run `sudo vi /etc/sysconfig/selinux` and set `SELINUX=disabled` to make change permanent.
+    - For permissions related issues, disable SELinux by running `sudo setenforce 0` from inside the `/var/www/html` folder. After that, run `sudo vi /etc/sysconfig/selinux` and set `SELINUX=disabled` to make change permanent. This will have to be done on all 3 webservers.
 
     - Restart httpd to make changes take effect. Run `sudo systemctl restart httpd`.
 
