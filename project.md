@@ -4,25 +4,25 @@
 ---
 
 - Spun up a new RHEL 8 OS on AWS. Attached 3 EBS blocks of 10GB each. Ran the `lsblk` command to confirm.
-![Confirm if EBS is attached](lsblk.png)
+![Confirm if EBS is attached](images/lsblk.png)
 
 - Ran the `df -h` command to see all available mounts on the server before configuring the various servers. Also installed the `lvm2` tool for storage/partitioning config.
 
-![Pre-config check](preconf.png)
+![Pre-config check](images/preconf.png)
 
 - Used the `gdisk` tool to create a single partition on each of the 3 disks. This step mustbe done on all 3 disks to be valid.
     - Ran `sudo gdisk /dev/xvdb` to configure the partition on the first disk. Use the screenshot below as guide.
     
-![Configure partition](mountpart.png)
+![Configure partition](images/mountpart.png)
     
 *When creating a new partition, use 8E00 to select LVM*
 
 - Ran the `lsblk` command to see the newly configured partitions.
 
-![Second disk check](diskcheck.png)
+![Second disk check](images/diskcheck.png)
 
 - Ran the `lvmdiskscan` command to scan the disk before setting up the physical volumes that is needed for the partitioning.
-![Pre-PV diskscan](prediskscan.png)
+![Pre-PV diskscan](images/prediskscan.png)
 
 - Used the `pvcreate` command to create the physical volumes needed for the 3 disks. See command below. Note that the directory is dependent on where the disks were attached and the name assigned.
 ```
@@ -32,35 +32,35 @@ sudo pvcreate /dev/xvdd1
 ```
 After running the above command to create the physical volume, used the `sudo pvs` and `sudo lvmdiskscan` to check for the newly created physical volumes.
 
-![Post-PV diskscan](config%2Bpostdiskscan.png)
+![Post-PV diskscan](images/config%2Bpostdiskscan.png)
 
 - Used the `vgcreate` utility to add all PVs to a volume group called nfs-vg. Checked the VG with `sudo vgs`
-![Volume group](vgcreate.png)
+![Volume group](images/vgcreate.png)
 
 - Used the `lvcreate` utility to create the required logical volumes which are `lv-apps`, `lv-opt` & `lv-logs`. Assigned them 9GB each. Checked the config using `sudo lvmdiskscan` & `sudo lvs`
-![Logical VG create](lvcreate.png)
+![Logical VG create](images/lvcreate.png)
 
 *I ran into an issue where I assigned each LV 10GB and ran out of space while configuring the third LV. I had to use `lvremove nfs-vg` to remove all the LVs from the `nfs-vg` volume group*
 
-![Error LV creation](errorlvcreate.png)
+![Error LV creation](images/errorlvcreate.png)
 
 - Formatted the logical volumes using the `xfs` filesystem. Used `sudo mkfs.xfs /<filepath>`
-![Filesystem format](xfs.png)
+![Filesystem format](images/xfs.png)
 
 *Use `sudo vgdisplay -v #view complete setup - VG, PV, and LV` to get a comprehensive report of all PVs, VGs and LVs*
 
 - Created mount points on the /mnt directory for the 3 created logical volumes where data will be stored. After creating the points, mounted all LVs to their respective paths.
 
-![Mount points](mount.png)
+![Mount points](images/mount.png)
 
 - In order to make the above configs persist after a system restart, the UUID of the 3 paths needs to be copied and pasted in the /etc/fstab file. Ran `sudo blkid /dev/nfs-vg/*`, which shows the UUID ofthenewly created logical volumes.
-![LV UUID](uuid.png)
+![LV UUID](images/uuid.png)
 
 - Head over to the `/etc/fstab` file and paste the copied UUIDs to look like the format below.
-![Update fstab](fstab.png)
+![Update fstab](images/fstab.png)
 
 - Run `sudo mount -a` to mount changes. After that, run `df -h` to see if changes have been made.
-![Post mount check](postmountcheck.png)
+![Post mount check](images/postmountcheck.png)
 
 **Step 1.1 - Install NFS Server**
 ---
@@ -78,10 +78,10 @@ sudo systemctl status nfs-server.service
 ```
 - Set up the permissions on the server to allow the web servers read and execute files on the NFS. Restart the NFS server after config. See screenshot below:
 
-![Permission modification](permission.png)
+![Permission modification](images/permission.png)
 
 - Locate the subnet CIDR from AWS (or wherever) as this is needed to allow clients on the same subet to access the NFS files.
-![Subnet CIDR](subnetcidr.png)
+![Subnet CIDR](images/subnetcidr.png)
 
 - Using the subnet CIDR gooten from earlier, we cconfigure access to NFS for clients within the same subnets. Ran a `sudo vi /etc/exports` and pasted the following config lines to declare the subnet CIDR to be used for communication.
 ```
@@ -89,15 +89,15 @@ sudo systemctl status nfs-server.service
 /mnt/logs <Subnet-CIDR>(rw,sync,no_all_squash,no_root_squash)
 /mnt/opt <Subnet-CIDR>(rw,sync,no_all_squash,no_root_squash)
 ```
-![etc/exports](etcexports.png)
+![etc/exports](images/etcexports.png)
 
 - Ran `sudo exportfs -arv` to export the above CIDR range.
 
 - Ran `rpcinfo -p | grep nfs` to check what port is being used by NFS so it can be opened in the security group.
-![Port info](grepnfs.png)
+![Port info](images/grepnfs.png)
 
 - Opened up the required ports from the above step to allow inbound traffic. Tightened security to use only the private IP of the machine and not 0.0.0.0
-![Security rules](inbound.png)
+![Security rules](images/inbound.png)
 
 **Step 2 - Configure The Database Server**
 ---
@@ -122,10 +122,10 @@ FLUSH PRIVILEGES;
 SHOW DATABASES;
 exit
 ```
-![Show databases](showdb.png)
+![Show databases](images/showdb.png)
 
 - Edit the bind address so MySQL allows connection from the specified IP used when creating the user. Run `sudo vi /etc/mysql/mysql.conf.d/mysqld.cnf` and add the IP address to the config file to set up the binding.
-![Bind address](binding.png)
+![Bind address](images/binding.png)
 
 - Run `sudo systemctl restart mysql` to restart MySQL so the changes can take effect.
 
@@ -138,7 +138,7 @@ exit
 
 - After the above folder has been created, we need to map it to the original drive (`mnt/apps`) in the server so the client can communicate with it. Run `sudo mount -t nfs -o rw,nosuid <NFS-Server-Private-IP-Address>:/mnt/apps /var/www`. Run `df -h` to confirm settings.
 
-![NFS mount check](nfsmountcheck.png)
+![NFS mount check](images/nfsmountcheck.png)
 
 - Modify the `/etc/fstab` file and add `<NFS-Server-Private-IP-Address>:/mnt/apps /var/www nfs defaults 0 0` to make the changes persist after reboot.
 
@@ -165,42 +165,42 @@ setsebool -P httpd_execmem 1
 
 - Verify that Apache files and directories are available on the web server on `/var/www` and on the NFS server in `/mnt/apps`. Created a file called `test.txt` and it was present in both the NFS and web server.
 
-![NFS server check](nfscheck.png)
+![NFS server check](images/nfscheck.png)
 
-![web server check](wscheck.png)
+![web server check](images/wscheck.png)
 
 - Next step is to fork the GitHub repo where the tooling website source code is held to your (my) GitHub account.
     - Install git by running`sudo yum install git -y`
 
     - Run `git clone https://github.com/darey-io/tooling.git`. The code will copy the contents of the repo into the `/tooling` drive. See screenshot below:
-  ![Git clone](tooling.png)
+  ![Git clone](images/tooling.png)
 
     - Change directory back into the `/html` (/`var/www/html`) folder. You will see the `tooling` & another `html` folder in it. We need to copy the contents of the `tooling` & sub `html` folder inside the current `/var/www/html` directory as that is where Apache web files are hosted.
         - Run the following commands `mv tooling/* .` & `mv html/* .`. This command moves all the contents inside the folders (*) and drops them in the present/current directory (.)
-        ![Deploy source code to web server](movewebfiles.png)
+        ![Deploy source code to web server](images/movewebfiles.png)
 
     - Install MySQL client (`sudo yum install -y mysql`) on the webserver. After that, update the website's config file to be able to connect to the database. Open the `/var/www/html/functions.php` file and modify it to include the DB private IP, user, password and database.
-    ![PHP function config](functionsphp.png)
+    ![PHP function config](images/functionsphp.png)
 
     - Apply the `tooling-db.sql` script from the webserver to the database server. 
     ```
     mysql -u <db-username> -p -h <db-private-ip> tooling < tooling-db.sql
     ```
-    ![Tooling DB script](toolingdb.png)
+    ![Tooling DB script](images/toolingdb.png)
 
     - After the script has successfully run, connect to the db via running `mysql -h <databse-private-ip> -u <db-username> -p <db-pasword>`. After that, run `show databases` to see if the `tooling` database is there, use `use tooling` to select the tooling database and then run `select * from users` to see the available users.
     
-  ![Show users](selectallusers.png)
+  ![Show users](images/selectallusers.png)
 
     - For permissions related issues, disable SELinux by running `sudo setenforce 0` from inside the `/var/www/html` folder. After that, run `sudo vi /etc/sysconfig/selinux` and set `SELINUX=disabled` to make change permanent. This will have to be done on all 3 webservers.
 
     - Restart httpd to make changes take effect. Run `sudo systemctl restart httpd`.
 
     - Lastly, open `http://<Web-Server-Public-IP-Address-or-Public-DNS-Name>/index.php` in a browser and you should see a login page. After putting in the credentials, you willbe redirected to the propitix home page.
-    ![Login page](loginpage.png)
+    ![Login page](images/loginpage.png)
 
-    ![Login success](loginsuccess.png)
+    ![Login success](images/loginsuccess.png)
 
-    ![Propitix homepage](propitixhome.png)
+    ![Propitix homepage](images/propitixhome.png)
 
     **Tooling Solution With NFS Deployed Successfully!**
